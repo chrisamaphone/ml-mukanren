@@ -40,8 +40,8 @@ structure MuKanren = struct
   fun mplus a1 a2 = 
     case (a1, a2) of
          (Nil, _) => a2
-       | (Cons(st,a1), a2) => Cons (st, mplus a1 a2) 
-       | (Lazy f, a2) => Lazy (fn () => mplus (f()) a2)
+       | (Cons(st,a1), a2) => Cons (st, mplus a1 a2)
+       | (Lazy a1, a2) => Lazy (fn () => mplus a2 (a1()))
 
   (* bind : state stream -> goal -> state list *)
   fun bind states goal =
@@ -72,5 +72,13 @@ structure MuKanren = struct
 
   fun conj g1 g2 =
     fn (state, counter) => bind (g1 (state, counter)) g2 
+
+
+  (* test cases *)
+  val empty_state = ([], 0)
+  fun fives x = disj (equiv x (Var 5)) (fn sc => Lazy (fn () => (fives x) sc))
+  val test_fives = call_fresh fives empty_state 
+
+  fun force (Lazy f) = f ()
 
 end
