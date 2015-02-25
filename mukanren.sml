@@ -4,7 +4,6 @@ structure MuKanren = struct
   datatype term = Var of var | Pair of term * term
 
   (* walk : term -> subst -> term option *)
-  (* find the substitution for the given term *)
   fun walk u s =
     (case u of
        Var u => (case List.find (fn (v,t) => u = v) s of
@@ -12,9 +11,7 @@ structure MuKanren = struct
                     | SOME (u, t) => walk t s)
     | t => SOME t)
 
-  exception Unimp
-
-  fun extend s (v,t) = raise Unimp
+  fun extend s (v,t) = (v,t)::s
 
   fun unify u v s =
   let
@@ -52,7 +49,6 @@ structure MuKanren = struct
          Nil => mzero
        | (Cons(st,states)) => mplus (goal st) (bind states goal)
        | (Lazy f) => Lazy (fn () => bind (f()) goal)
-
 
   type subst = (var * term) list
   type state = subst * int
