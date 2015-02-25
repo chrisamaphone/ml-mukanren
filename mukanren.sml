@@ -32,14 +32,33 @@ structure MuKanren = struct
       | _ => NONE
   end
 
-  val mzero = []
-  fun unit_ state = [state]
+  (* mixed lazy/eager lists *)
+  datatype 'a stream = Nil 
+                     | Cons of 'a * 'a stream 
+                     | Lazy of (unit -> 'a stream)
+  val mzero = Nil
+  fun unit_ state = Cons (state, mzero)
+
+  (* mplus : state stream -> state stream -> state stream *)
+  fun mplus a1 a2 = 
+    case (a1, a2) of
+         (Nil, _) => a2
+       | (Cons(st,a1), a2) => Cons (st, mplus a1 a2) 
+       | (Lazy f, a2) => Lazy (fn () => mplus (f()) a2)
+
+  (* bind : state stream -> goal -> state list *)
+  fun bind states goal =
+    case states of
+         Nil => mzero
+       | (Cons(st,states)) => mplus (goal st) (bind states goal)
+       | (Lazy f) => Lazy (fn () => bind (f()) goal)
+
 
   type subst = (var * term) list
   type state = subst * int
-  type goal = state -> state list
+  type goal = state -> state stream
 
-  (* equiv : term -> term -> (subst * int) -> state list *)
+  (* equiv : term -> term -> (subst * int) -> state stream *)
   fun equiv u v : goal =
     fn (subst, counter) =>
       (case unify u v subst of
@@ -50,20 +69,6 @@ structure MuKanren = struct
   fun call_fresh f : goal =
     fn (subst, counter) =>
       f (Var counter) (subst, counter + 1)
-
-  (* XXX "procedure?" part of these defs? *)
-  fun mplus a1 a2 = a1 @ a2
-    (*
-    case (a1, a2) of
-         ([], _) => a2
-       | (st::a1, a2) => st::(mplus a1 a2) 
-    *)
-
-  (* bind : state list -> goal -> state list *)
-  fun bind states goal =
-    case states of
-         [] => mzero
-       | (st::states) => mplus (goal st) (bind states goal)
 
   (* disj : goal -> goal -> goal *)
   fun disj g1 g2 =
