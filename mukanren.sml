@@ -1,33 +1,31 @@
 structure MuKanren = struct
 
   type var = int
-  datatype term = Var of var | Pair of term * term
+  datatype term = Var of var | Pair of term * term | Int of int
 
   (* walk : term -> subst -> term option *)
   fun walk u s =
     (case u of
        Var u => (case List.find (fn (v,t) => u = v) s of
-                      NONE => NONE
+                      NONE => Var u
                     | SOME (u, t) => walk t s)
-    | t => SOME t)
+    | t => t)
 
   fun extend s (v,t) = (v,t)::s
 
   fun unify u v s =
-  let
-    val (u, v) = (walk u s, walk v s)
-  in
-    case (u, v) of
-      (SOME u, SOME v) => (case (u, v) of
-          (Var u, Var v) => if u = v then SOME s else NONE
-        | (Var u, _) => SOME (extend s (u,v))
-        | (_, Var v) => SOME (extend s (v,u))
-        | (Pair (u1, u2), Pair (v1, v2)) =>
-            (case unify u1 u2 s of
-                NONE => NONE
-              | SOME s => unify u2 v2 s))
-      | _ => NONE
-  end
+    case (walk u s, walk v s) of
+        (Var u, Var v) => if u = v 
+                          then SOME s 
+                          else SOME (extend s (u, Var v)) 
+      | (Var u, _) => SOME (extend s (u,v))
+      | (_, Var v) => SOME (extend s (v,u))
+      | (Pair (u1, u2), Pair (v1, v2)) =>
+          (case unify u1 u2 s of
+              NONE => NONE
+            | SOME s => unify u2 v2 s)
+      | (Int i1, Int i2) => if i1 = i2 then SOME s else NONE
+      | (_, _) => NONE
 
   (* mixed lazy/eager lists *)
   datatype 'a stream = Nil 
@@ -76,7 +74,10 @@ structure MuKanren = struct
 
   (* test cases *)
   val empty_state = ([], 0)
-  fun fives x = disj (equiv x (Var 5)) (fn sc => Lazy (fn () => (fives x) sc))
+
+  fun five x = equiv x (Int 5)
+
+  fun fives x = disj (equiv x (Int 5)) (fn sc => Lazy (fn () => (fives x) sc))
   val test_fives = call_fresh fives empty_state 
 
   fun force (Lazy f) = f ()
